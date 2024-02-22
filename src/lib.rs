@@ -178,6 +178,10 @@ impl Client {
         insert::Insert::new(self, table)
     }
 
+    pub fn insert_any<T: Row>(&self, table: &str) -> Result<insert::Insert<()>> {
+        insert::Insert::new_any::<T>(self, table)
+    }
+
     /// Creates an inserter to perform multiple INSERTs.
     #[cfg(feature = "inserter")]
     pub fn inserter<T: Row>(&self, table: &str) -> Result<inserter::Inserter<T>> {

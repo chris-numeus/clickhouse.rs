@@ -59,6 +59,21 @@ impl<T> Insert<T> {
     where
         T: Row,
     {
+        let fields = row::join_column_names::<T>()
+            .expect("the row type must be a struct or a wrapper around it");
+        Self::new_with(client, table, &fields)
+    }
+
+    pub(crate) fn new_any<R>(client: &Client, table: &str) -> Result<Self>
+    where
+        R: Row,
+    {
+        let fields = row::join_column_names::<R>()
+            .expect("the row type must be a struct or a wrapper around it");
+        Self::new_with(client, table, &fields)
+    }
+
+    pub(crate) fn new_with(client: &Client, table: &str, fields: &str) -> Result<Self> {
         let mut url = Url::parse(&client.url).map_err(|err| Error::InvalidParams(err.into()))?;
         let mut pairs = url.query_pairs_mut();
         pairs.clear();
@@ -66,9 +81,6 @@ impl<T> Insert<T> {
         if let Some(database) = &client.database {
             pairs.append_pair("database", database);
         }
-
-        let fields = row::join_column_names::<T>()
-            .expect("the row type must be a struct or a wrapper around it");
 
         // TODO: what about escaping a table name?
         // https://clickhouse.yandex/docs/en/query_language/syntax/#syntax-identifiers
@@ -169,6 +181,13 @@ impl<T> Insert<T> {
     where
         T: Serialize,
     {
+        self.write_any(row)
+    }
+
+    pub fn write_any<'a, R>(&'a mut self, row: &R) -> impl Future<Output = Result<()>> + 'a + Send
+    where
+        R: Serialize,
+    {
         let result = self.do_write(row);
 
         async move {
@@ -181,9 +200,9 @@ impl<T> Insert<T> {
     }
 
     #[inline(always)]
-    pub(crate) fn do_write(&mut self, row: &T) -> Result<usize>
+    pub(crate) fn do_write<R>(&mut self, row: &R) -> Result<usize>
     where
-        T: Serialize,
+        R: Serialize,
     {
         assert!(self.sender.is_some(), "write() after error");
 
